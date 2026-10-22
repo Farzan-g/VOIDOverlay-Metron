@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>..\..\assets\Metron.ico</ApplicationIcon>
+    <AssemblyName>VOIDOverlay.Metron</AssemblyName>
+    <AssemblyTitle>VOIDOverlay Metron</AssemblyTitle>
+    <AssemblyDescription>A lightweight system performance overlay.</AssemblyDescription>
+    <InformationalVersion>Development</InformationalVersion>
+    <Product>VOIDOverlay Metron</Product>
+    <Description>A lightweight system performance overlay.</Description>
+    <Company>VOID Overlay</Company>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="..\..\assets\Metron.ico">
+      <Link>assets\Metron.ico</Link>
+    </Resource>
+  </ItemGroup>
+
+</Project>

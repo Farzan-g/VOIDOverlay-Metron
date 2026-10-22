@@ -1,0 +1,80 @@
+<Window x:Class="VOIDOverlay.Metron.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Metron Settings"
+        Icon="pack://application:,,,/assets/Metron.ico"
+        Width="460"
+        Height="610"
+        MinWidth="460"
+        MinHeight="560"
+        WindowStartupLocation="CenterScreen"
+        Background="#111720"
+        Foreground="#F2F4F7">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <StackPanel Margin="0,0,0,14">
+            <TextBlock Text="METRON" FontSize="11" FontWeight="Bold" Foreground="#4DE3D2" />
+            <TextBlock Text="Settings" FontSize="24" FontWeight="SemiBold" />
+        </StackPanel>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <TextBlock Text="GENERAL" Foreground="#FFAE5C" FontWeight="Bold" Margin="0,4,0,8" />
+                <CheckBox x:Name="StartupCheck" Content="Launch with Windows" Margin="0,4" />
+                <CheckBox x:Name="TopmostCheck" Content="Keep overlay on top" Margin="0,4" />
+                <CheckBox x:Name="LockedCheck" Content="Lock overlay position" Margin="0,4" />
+                <CheckBox x:Name="StartVisibleCheck" Content="Show overlay at launch" Margin="0,4" />
+
+                <TextBlock Text="METRICS" Foreground="#FFAE5C" FontWeight="Bold" Margin="0,18,0,8" />
+                <WrapPanel>
+                    <CheckBox x:Name="CpuCheck" Content="CPU" Margin="0,4,16,4" />
+                    <CheckBox x:Name="GpuCheck" Content="GPU" Margin="0,4,16,4" />
+                    <CheckBox x:Name="RamCheck" Content="RAM" Margin="0,4,16,4" />
+                    <CheckBox x:Name="FpsCheck" Content="FPS" Margin="0,4" />
+                </WrapPanel>
+                <TextBlock Text="Refresh interval" Margin="0,10,0,4" />
+                <ComboBox x:Name="IntervalCombo" Width="130" HorizontalAlignment="Left" SelectedValuePath="Tag">
+                    <ComboBoxItem Content="250 ms" Tag="250" />
+                    <ComboBoxItem Content="500 ms" Tag="500" />
+                    <ComboBoxItem Content="1000 ms" Tag="1000" />
+                    <ComboBoxItem Content="2000 ms" Tag="2000" />
+                </ComboBox>
+
+                <TextBlock Text="APPEARANCE" Foreground="#FFAE5C" FontWeight="Bold" Margin="0,18,0,8" />
+                <TextBlock Text="Font size" />
+                <Slider x:Name="FontSlider" Minimum="9" Maximum="24" TickFrequency="1" IsSnapToTickEnabled="True" />
+                <TextBlock Text="Overlay opacity" Margin="0,4,0,0" />
+                <Slider x:Name="OpacitySlider" Minimum="0.3" Maximum="1" TickFrequency="0.05" />
+
+                <TextBlock Text="POSITION" Foreground="#FFAE5C" FontWeight="Bold" Margin="0,18,0,8" />
+                <StackPanel x:Name="PositionControls">
+                    <TextBlock Text="Anchor" />
+                    <ComboBox x:Name="PositionCombo" />
+                    <TextBlock Text="Monitor" Margin="0,8,0,4" />
+                    <ComboBox x:Name="MonitorCombo" DisplayMemberPath="Name" />
+                    <WrapPanel Margin="0,8,0,0">
+                        <StackPanel>
+                            <TextBlock Text="X offset" />
+                            <TextBox x:Name="OffsetXBox" Width="90" Margin="0,4,12,0" />
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Text="Y offset" />
+                            <TextBox x:Name="OffsetYBox" Width="90" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </WrapPanel>
+                </StackPanel>
+
+                <TextBlock Text="FPS SOURCE" Foreground="#FFAE5C" FontWeight="Bold" Margin="0,18,0,8" />
+                <TextBlock Text="No safe, universal game-frame provider is configured. FPS remains unavailable rather than showing a guessed value."
+                           TextWrapping="Wrap" Foreground="#B9C3D0" />
+            </StackPanel>
+        </ScrollViewer>
+        <DockPanel Grid.Row="2" Margin="0,12,0,0">
+            <Button Content="Reset defaults" Click="Reset_Click" HorizontalAlignment="Left" Padding="12,6" />
+            <Button Content="Done" Click="Done_Click" HorizontalAlignment="Right" Padding="18,6" />
+        </DockPanel>
+    </Grid>
+</Window>
