@@ -22,10 +22,11 @@ public static class PositionService
         var windowWidth = window.ActualWidth > 0 ? window.ActualWidth : window.Width;
         var windowHeight = window.ActualHeight > 0 ? window.ActualHeight : window.Height;
         var (scaleX, scaleY) = GetScale(screen);
-        var left = screen.WorkingArea.Left / scaleX;
-        var top = screen.WorkingArea.Top / scaleY;
-        var width = screen.WorkingArea.Width / scaleX;
-        var height = screen.WorkingArea.Height / scaleY;
+        var edgeBounds = settings.EdgeReference == OverlayEdgeReference.FullScreen ? screen.Bounds : screen.WorkingArea;
+        var left = edgeBounds.Left / scaleX;
+        var top = edgeBounds.Top / scaleY;
+        var width = edgeBounds.Width / scaleX;
+        var height = edgeBounds.Height / scaleY;
         var placement = ComputePlacement(
             new Rect(left, top, width, height),
             windowWidth,
@@ -45,7 +46,7 @@ public static class PositionService
         int offsetX,
         int offsetY)
     {
-        const double margin = 12;
+        const double margin = 10;
         var x = position switch
         {
             OverlayPosition.TopLeft or OverlayPosition.BottomLeft => workArea.Left + margin,

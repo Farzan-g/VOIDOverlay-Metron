@@ -1,4 +1,4 @@
-name: Windows build
+name: VOID Overlay Metron - Windows verification
 
 on:
   push:
@@ -6,18 +6,18 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-test-publish:
+  verify:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-      - name: Restore
-        run: dotnet restore VOIDOverlay.Metron.sln
-      - name: Build
-        run: dotnet build VOIDOverlay.Metron.sln --configuration Release --no-restore
-      - name: Test
-        run: dotnet test tests\VOIDOverlay.Metron.Tests\VOIDOverlay.Metron.Tests.csproj --configuration Release --no-build
+      - name: Build Debug
+        run: .\scripts\build.ps1 -Configuration Debug
+      - name: Test Release
+        run: .\scripts\test.ps1 -Configuration Release
+      - name: Build Release
+        run: .\scripts\build.ps1 -Configuration Release
       - name: Publish Windows x64
-        run: dotnet publish src\VOIDOverlay.Metron\VOIDOverlay.Metron.csproj --configuration Release --runtime win-x64 --no-self-contained -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false --output artifacts\publish
+        run: .\scripts\publish.ps1

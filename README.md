@@ -1,8 +1,8 @@
-# VOIDOverlay Metron
+# VOID Overlay Metron
 
-VOIDOverlay Metron is a compact Windows performance overlay for gaming and desktop use. It displays CPU utilization, a Windows GPU-engine activity reading, physical RAM usage, and an FPS slot that remains unavailable unless a real frame-measurement provider is added.
+VOID Overlay Metron is a compact Windows performance overlay for gaming and desktop use. It displays CPU utilization, a Windows GPU-engine activity reading, physical RAM usage, and an FPS slot that remains unavailable unless a real frame-measurement provider is added.
 
-The project is an independent VOID Overlay sibling. It does not depend on or modify VOIDOverlay Termo and does not monitor temperatures.
+The project is an independent VOID Overlay sibling. It does not depend on or modify [VOID Overlay Termo](../Termo/README.md) and does not monitor temperatures.
 
 ## Features
 
@@ -17,26 +17,25 @@ The project is an independent VOID Overlay sibling. It does not depend on or mod
 
 ## Platform and installation
 
-The application targets Windows 10 and Windows 11 x64 and .NET 10 WPF. The publish script produces a framework-dependent, single-file x64 build. The .NET 10 Desktop Runtime (x64) must be installed on the target PC. A self-contained build was not selected because downloading the Windows Desktop runtime pack failed in the current build environment.
+The application targets Windows 10 and Windows 11 x64 and .NET 10 WPF. The publish script produces framework-dependent x64 output under `artifacts\publish\win-x64`. The .NET 10 Desktop Runtime (x64) must be installed on the target PC.
 
-To build a local package:
+To publish a local build:
 
 1. Install the .NET 10 SDK on Windows.
 2. From the repository root, run `.\scripts\publish.ps1`.
-3. Optionally run `.\scripts\package.ps1` to create `artifacts\VOIDOverlay-Metron-win-x64.zip`.
-4. Extract the ZIP and launch `VOIDOverlay.Metron.exe`.
+3. Launch `artifacts\publish\win-x64\VOIDOverlay.Metron.exe`.
 
-Publishing stages and validates a replacement before updating an existing publish folder, and packaging only replaces an existing ZIP after the new archive is complete. No release version, GitHub release, or download URL is configured yet, so the ZIP name is intentionally unversioned.
+Publishing stages and validates a replacement before updating an existing publish folder. The build and publish workflow does not create archives or releases.
 
 ## First launch and tray
 
 Metron starts with the overlay visible by default. The tray icon remains available when the overlay is hidden. Its menu provides:
 
 - **Show/Hide Overlay**
-- **Settings**
+- **Open Settings...**
 - **Lock Position**
 - **Start with Windows**
-- **About**
+- **About VOID Overlay Metron**
 - **Exit**
 
 Closing the settings window hides it rather than exiting the application. Use **Exit** in the tray menu to stop monitoring and shut down cleanly. A second launch asks the existing process to reveal its overlay instead of starting another instance.
@@ -90,16 +89,13 @@ Settings apply immediately. Supported update intervals are 250, 500, 1000, and 2
 
 Requirements: Windows, .NET 10 SDK, and network access for restoring the test packages on a fresh machine.
 
-`assets\Metron.ico` is regenerated from the unchanged `assets\Metron.png` source by `.\scripts\convert-icon.ps1` before the build and publish scripts run.
-
 ```powershell
 .\scripts\build.ps1
 .\scripts\test.ps1
 .\scripts\publish.ps1
-.\scripts\package.ps1
 ```
 
-The app itself has no third-party runtime package references. The test project uses xUnit, Microsoft.NET.Test.Sdk, and coverlet.collector. Hardware-specific GPU integration was not exercised by the unit tests; the tests cover portable logic such as sampling calculations, settings validation, positioning, and FPS state expiration.
+The app icon resources are kept in `src\VOIDOverlay.Metron\assets`; builds use those tracked files directly and do not modify them. The app itself has no third-party runtime package references. The test project uses xUnit, Microsoft.NET.Test.Sdk, and coverlet.collector. Hardware-specific GPU integration was not exercised by the unit tests; the tests cover portable logic such as sampling calculations, settings validation, positioning, and FPS state expiration.
 
 ## License
 

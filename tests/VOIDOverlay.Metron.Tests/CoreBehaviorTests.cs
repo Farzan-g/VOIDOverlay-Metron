@@ -90,7 +90,7 @@ public sealed class CoreBehaviorTests
             var loaded = new SettingsStore(path).Load();
 
             Assert.Equal(500, loaded.RefreshIntervalMs);
-            Assert.Equal(13, loaded.FontSize);
+            Assert.Equal(24, loaded.FontSize);
             Assert.Equal(OverlayPosition.TopCenter, loaded.Position);
         }
         finally
@@ -103,6 +103,48 @@ public sealed class CoreBehaviorTests
     }
 
     [Fact]
+    public void AppearanceDefaultsMatchProductFamilyStandard()
+    {
+        var settings = AppSettings.Defaults();
+
+        Assert.Equal(OverlayPosition.TopCenter, settings.Position);
+        Assert.Equal(OverlayEdgeReference.WorkArea, settings.EdgeReference);
+        Assert.Equal(13, settings.FontSize);
+        Assert.Equal(1, settings.Opacity);
+        Assert.True(settings.BackgroundEnabled);
+        Assert.Equal("#111720", settings.BackgroundColor);
+        Assert.Equal(0.5, settings.BackgroundOpacity);
+        Assert.Equal("#F2F4F7", settings.TextColor);
+        Assert.Equal("#4DE3D2", settings.AccentColor);
+        Assert.Equal("#FFAE5C", settings.SecondaryAccentColor);
+        Assert.True(settings.IsLocked);
+        Assert.True(settings.ClickThrough);
+    }
+
+    [Fact]
+    public void SettingsValidationAppliesSharedAppearanceAndOffsetRanges()
+    {
+        var settings = new AppSettings
+        {
+            FontSize = 50,
+            Opacity = double.NaN,
+            BackgroundOpacity = 5,
+            BackgroundColor = "invalid",
+            OffsetX = -900,
+            OffsetY = 5000
+        };
+
+        settings.Validate();
+
+        Assert.Equal(24, settings.FontSize);
+        Assert.Equal(1, settings.Opacity);
+        Assert.Equal(1, settings.BackgroundOpacity);
+        Assert.Equal("#111720", settings.BackgroundColor);
+        Assert.Equal(-200, settings.OffsetX);
+        Assert.Equal(1000, settings.OffsetY);
+    }
+
+    [Fact]
     public void PositionCalculationAppliesAnchorOffsetsAndClampsToWorkArea()
     {
         var area = new Rect(100, 50, 800, 600);
@@ -111,7 +153,7 @@ public sealed class CoreBehaviorTests
         var clamped = PositionService.ComputePlacement(area, 200, 40, OverlayPosition.BottomRight, 500, 500);
 
         Assert.Equal(410, centered.X);
-        Assert.Equal(67, centered.Y);
+        Assert.Equal(65, centered.Y);
         Assert.Equal(700, clamped.X);
         Assert.Equal(610, clamped.Y);
     }

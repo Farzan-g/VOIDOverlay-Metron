@@ -15,6 +15,7 @@ public partial class MainWindow : Window
     private const int WsExNoActivate = 0x08000000;
     private const int WmAppShow = 0x8001;
     private readonly AppSettings settings;
+    private readonly SolidColorBrush separatorBrush = new(System.Windows.Media.Color.FromArgb(128, 242, 244, 247));
 
     public MainWindow(AppSettings settings)
     {
@@ -48,6 +49,15 @@ public partial class MainWindow : Window
         FontSize = settings.FontSize;
         Opacity = settings.Opacity;
         Topmost = settings.KeepOnTop;
+        OverlaySurface.Background = CreateBrush(
+            settings.BackgroundColor,
+            settings.BackgroundOpacity,
+            settings.BackgroundEnabled);
+        CpuText.Foreground = CreateBrush(settings.AccentColor);
+        GpuText.Foreground = CreateBrush(settings.SecondaryAccentColor);
+        RamText.Foreground = CreateBrush(settings.TextColor);
+        FpsText.Foreground = CreateBrush(settings.TextColor);
+        ApplyClickThroughState();
         CpuText.Visibility = settings.ShowCpu ? Visibility.Visible : Visibility.Collapsed;
         GpuText.Visibility = settings.ShowGpu ? Visibility.Visible : Visibility.Collapsed;
         RamText.Visibility = settings.ShowRam ? Visibility.Visible : Visibility.Collapsed;
@@ -64,7 +74,7 @@ public partial class MainWindow : Window
         {
             if (index > 0)
             {
-                MetricsPanel.Children.Add(new TextBlock { Text = "  |  ", Foreground = new SolidColorBrush(System.Windows.Media.Color.FromArgb(128, 255, 255, 255)) });
+                MetricsPanel.Children.Add(new TextBlock { Text = "|", Foreground = separatorBrush, Margin = new Thickness(0, 0, 8, 0) });
             }
 
             MetricsPanel.Children.Add(visibleMetrics[index]);
@@ -100,9 +110,37 @@ public partial class MainWindow : Window
     {
         var handle = new WindowInteropHelper(this).Handle;
         var styles = GetWindowLongPtr(handle, GwlExStyle).ToInt64();
-        styles |= WsExTransparent | WsExToolWindow | WsExNoActivate;
+        styles |= WsExToolWindow | WsExNoActivate;
+        styles = settings.ClickThrough ? styles | WsExTransparent : styles & ~WsExTransparent;
         SetWindowLongPtr(handle, GwlExStyle, new IntPtr(styles));
         HwndSource.FromHwnd(handle)?.AddHook(WindowMessageHook);
+    }
+
+    private void ApplyClickThroughState()
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+        if (handle == IntPtr.Zero)
+        {
+            return;
+        }
+
+        var styles = GetWindowLongPtr(handle, GwlExStyle).ToInt64();
+        styles = settings.ClickThrough ? styles | WsExTransparent : styles & ~WsExTransparent;
+        SetWindowLongPtr(handle, GwlExStyle, new IntPtr(styles));
+    }
+
+    private static SolidColorBrush CreateBrush(string color, double opacity = 1, bool enabled = true)
+    {
+        if (!enabled)
+        {
+            return System.Windows.Media.Brushes.Transparent;
+        }
+
+        var brush = new SolidColorBrush(
+            (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(color));
+        brush.Opacity = opacity;
+        brush.Freeze();
+        return brush;
     }
 
     private IntPtr WindowMessageHook(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)

@@ -18,6 +18,7 @@ public partial class App : System.Windows.Application
     private MainWindow? overlay;
     private Forms.NotifyIcon? trayIcon;
     private Forms.ContextMenuStrip? trayMenu;
+    private Forms.ToolStripMenuItem? visibilityMenuItem;
     private Forms.ToolStripMenuItem? lockMenuItem;
     private Forms.ToolStripMenuItem? startupMenuItem;
     private Icon? trayImage;
@@ -31,7 +32,7 @@ public partial class App : System.Windows.Application
         {
             instanceMutex.Dispose();
             instanceMutex = null;
-            var existingWindow = FindWindow(null, "VOIDOverlay Metron");
+            var existingWindow = FindWindow(null, "VOID Overlay Metron");
             if (existingWindow != IntPtr.Zero)
             {
                 PostMessage(existingWindow, WmAppShow, IntPtr.Zero, IntPtr.Zero);
@@ -87,8 +88,13 @@ public partial class App : System.Windows.Application
     {
         var menu = new Forms.ContextMenuStrip();
         trayMenu = menu;
-        menu.Items.Add("Show/Hide Overlay", null, (_, _) => ToggleOverlay());
-        menu.Items.Add("Settings", null, (_, _) => ShowSettings());
+        menu.Items.Clear();
+        menu.Items.Add(new Forms.ToolStripMenuItem("VOID Overlay Metron") { Enabled = false });
+        menu.Items.Add(new Forms.ToolStripSeparator());
+        menu.Items.Add("Open Settings...", null, (_, _) => ShowSettings());
+        visibilityMenuItem = new Forms.ToolStripMenuItem();
+        visibilityMenuItem.Click += (_, _) => ToggleOverlay();
+        menu.Items.Add(visibilityMenuItem);
         lockMenuItem = new Forms.ToolStripMenuItem("Lock Position") { Checked = settings.IsLocked, CheckOnClick = true };
         lockMenuItem.CheckedChanged += (_, _) =>
         {
@@ -116,11 +122,12 @@ public partial class App : System.Windows.Application
         menu.Items.Add(new Forms.ToolStripSeparator());
         var informationalVersion = typeof(App).Assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "Development";
-        menu.Items.Add("About", null, (_, _) => System.Windows.MessageBox.Show(
-            $"VOIDOverlay Metron\nVersion: {informationalVersion}\nLightweight system performance overlay.\n\nFPS is unavailable until a supported frame-statistics provider is configured.",
-            "About Metron",
+        menu.Items.Add("About VOID Overlay Metron", null, (_, _) => System.Windows.MessageBox.Show(
+            $"VOID Overlay Metron\nVersion: {informationalVersion}\nCPU, GPU-engine, and RAM utilization overlay.\n\nFPS is unavailable until a supported frame-statistics provider is configured.",
+            "About VOID Overlay Metron",
             MessageBoxButton.OK,
             MessageBoxImage.Information));
+        menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => Shutdown());
 
         var iconResource = GetResourceStream(new Uri("pack://application:,,,/assets/Metron.ico", UriKind.Absolute))
@@ -134,11 +141,12 @@ public partial class App : System.Windows.Application
         var notifyIcon = new Forms.NotifyIcon
         {
             Icon = trayImage,
-            Text = "VOIDOverlay Metron",
+            Text = "VOID Overlay Metron",
             ContextMenuStrip = menu,
             Visible = true
         };
         notifyIcon.DoubleClick += (_, _) => ToggleOverlay();
+        UpdateTrayMenu();
         return notifyIcon;
     }
 
@@ -150,6 +158,7 @@ public partial class App : System.Windows.Application
             metricsService.SetRefreshInterval(settingsWindow.Settings.RefreshIntervalMs);
             lockMenuItem!.Checked = settingsWindow.Settings.IsLocked;
             startupMenuItem!.Checked = settingsWindow.Settings.StartWithWindows;
+            UpdateTrayMenu();
         }
     }
 
@@ -173,6 +182,8 @@ public partial class App : System.Windows.Application
         {
             overlay.RevealFromTray();
         }
+
+        UpdateTrayMenu();
     }
 
     private void ShowSettings()
@@ -206,6 +217,24 @@ public partial class App : System.Windows.Application
         catch (UnauthorizedAccessException ex)
         {
             AppLog.Error($"Unable to save settings. {ex.Message}");
+        }
+    }
+
+    private void UpdateTrayMenu()
+    {
+        if (visibilityMenuItem is not null && overlay is not null)
+        {
+            visibilityMenuItem.Text = overlay.IsVisible ? "Hide Overlay" : "Show Overlay";
+        }
+
+        if (lockMenuItem is not null && settingsWindow is not null)
+        {
+            lockMenuItem.Checked = settingsWindow.Settings.IsLocked;
+        }
+
+        if (startupMenuItem is not null && startupManager is not null)
+        {
+            startupMenuItem.Checked = startupManager.IsEnabled();
         }
     }
 

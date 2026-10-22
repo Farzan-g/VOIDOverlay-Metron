@@ -1,7 +1,12 @@
+param(
+    [ValidateSet("Debug", "Release")]
+    [string]$Configuration = "Release"
+)
+
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $repoRoot "src\VOIDOverlay.Metron\VOIDOverlay.Metron.csproj"
-$output = Join-Path $repoRoot "artifacts\publish"
+$output = Join-Path $repoRoot "artifacts\publish\win-x64"
 $outputParent = Split-Path -Parent $output
 $runId = [Guid]::NewGuid().ToString("N")
 $staging = Join-Path $outputParent "publish.staging-$runId"
@@ -16,10 +21,9 @@ New-Item -ItemType Directory -Path $outputParent -Force | Out-Null
 try {
     Push-Location $repoRoot
     $locationPushed = $true
-    & (Join-Path $PSScriptRoot "convert-icon.ps1")
     try {
-        dotnet publish $project --configuration Release --runtime win-x64 --no-self-contained `
-            -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false --output $staging
+        dotnet publish $project --configuration $Configuration --runtime win-x64 --self-contained false `
+            -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false --output $staging
         if ($LASTEXITCODE -ne 0) {
             throw "Windows x64 publish failed with exit code $LASTEXITCODE."
         }

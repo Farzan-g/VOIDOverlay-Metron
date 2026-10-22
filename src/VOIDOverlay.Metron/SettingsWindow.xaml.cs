@@ -1,7 +1,8 @@
+using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
-using System.IO;
 using Forms = System.Windows.Forms;
 
 namespace VOIDOverlay.Metron;
@@ -13,6 +14,7 @@ public partial class SettingsWindow : Window
     private readonly StartupManager startupManager;
     private readonly DispatcherTimer saveTimer;
     private bool initialized;
+    private bool synchronizingOffsets;
     private bool allowClose;
 
     public event Action? SettingsChanged;
@@ -41,6 +43,8 @@ public partial class SettingsWindow : Window
     public void CloseForExit()
     {
         allowClose = true;
+        saveTimer.Stop();
+        PersistSettings();
         Close();
     }
 
@@ -52,89 +56,191 @@ public partial class SettingsWindow : Window
 
     private void LoadSettings()
     {
+        initialized = false;
         StartupCheck.IsChecked = startupManager.IsEnabled();
         TopmostCheck.IsChecked = settings.KeepOnTop;
         LockedCheck.IsChecked = settings.IsLocked;
+        ClickThroughCheck.IsChecked = settings.ClickThrough;
         StartVisibleCheck.IsChecked = settings.StartOverlayVisible;
-        CpuCheck.IsChecked = settings.ShowCpu;
-        GpuCheck.IsChecked = settings.ShowGpu;
-        RamCheck.IsChecked = settings.ShowRam;
-        FpsCheck.IsChecked = settings.ShowFps;
-        IntervalCombo.SelectedValue = settings.RefreshIntervalMs.ToString();
+        BackgroundEnabledCheck.IsChecked = settings.BackgroundEnabled;
+        BackgroundColorBox.Text = settings.BackgroundColor;
+        BackgroundOpacitySlider.Value = settings.BackgroundOpacity;
+        OverlayOpacitySlider.Value = settings.Opacity;
+        TextColorBox.Text = settings.TextColor;
+        AccentColorBox.Text = settings.AccentColor;
+        SecondaryAccentColorBox.Text = settings.SecondaryAccentColor;
+        FontSizeSlider.Value = settings.FontSize;
+        IntervalCombo.SelectedValue = settings.RefreshIntervalMs.ToString(CultureInfo.InvariantCulture);
         PositionCombo.SelectedItem = settings.Position;
         MonitorCombo.SelectedItem = MonitorCombo.Items
             .Cast<MonitorOption>()
             .FirstOrDefault(item => item.DeviceName.Equals(settings.MonitorDeviceName, StringComparison.OrdinalIgnoreCase))
             ?? MonitorCombo.Items.Cast<MonitorOption>().FirstOrDefault(item => item.DeviceName == (Forms.Screen.PrimaryScreen?.DeviceName ?? string.Empty));
-        FontSlider.Value = settings.FontSize;
-        OpacitySlider.Value = settings.Opacity;
-        OffsetXBox.Text = settings.OffsetX.ToString();
-        OffsetYBox.Text = settings.OffsetY.ToString();
+        EdgeReferenceCombo.SelectedIndex =
+            settings.EdgeReference == OverlayEdgeReference.WorkArea ? 0 : 1;
+        OffsetXSlider.Value = settings.OffsetX;
+        OffsetYSlider.Value = settings.OffsetY;
+        OffsetXBox.Text = settings.OffsetX.ToString(CultureInfo.InvariantCulture);
+        OffsetYBox.Text = settings.OffsetY.ToString(CultureInfo.InvariantCulture);
         PositionControls.IsEnabled = !settings.IsLocked;
         initialized = true;
     }
 
     private void WireChanges()
     {
-        StartupCheck.Checked += (_, _) => Save(updateStartup: true);
-        StartupCheck.Unchecked += (_, _) => Save(updateStartup: true);
-        TopmostCheck.Checked += (_, _) => Save();
-        TopmostCheck.Unchecked += (_, _) => Save();
-        LockedCheck.Checked += (_, _) => Save();
-        LockedCheck.Unchecked += (_, _) => Save();
-        StartVisibleCheck.Checked += (_, _) => Save();
-        StartVisibleCheck.Unchecked += (_, _) => Save();
-        CpuCheck.Checked += (_, _) => Save();
-        CpuCheck.Unchecked += (_, _) => Save();
-        GpuCheck.Checked += (_, _) => Save();
-        GpuCheck.Unchecked += (_, _) => Save();
-        RamCheck.Checked += (_, _) => Save();
-        RamCheck.Unchecked += (_, _) => Save();
-        FpsCheck.Checked += (_, _) => Save();
-        FpsCheck.Unchecked += (_, _) => Save();
-        IntervalCombo.SelectionChanged += (_, _) => Save();
-        PositionCombo.SelectionChanged += (_, _) => Save();
-        MonitorCombo.SelectionChanged += (_, _) => Save();
-        FontSlider.ValueChanged += (_, _) => Save();
-        OpacitySlider.ValueChanged += (_, _) => Save();
-        OffsetXBox.LostFocus += (_, _) => Save();
-        OffsetYBox.LostFocus += (_, _) => Save();
+        StartupCheck.Checked += StartupChanged;
+        StartupCheck.Unchecked += StartupChanged;
+        TopmostCheck.Checked += SettingsChangedHandler;
+        TopmostCheck.Unchecked += SettingsChangedHandler;
+        LockedCheck.Checked += SettingsChangedHandler;
+        LockedCheck.Unchecked += SettingsChangedHandler;
+        ClickThroughCheck.Checked += SettingsChangedHandler;
+        ClickThroughCheck.Unchecked += SettingsChangedHandler;
+        StartVisibleCheck.Checked += SettingsChangedHandler;
+        StartVisibleCheck.Unchecked += SettingsChangedHandler;
+        BackgroundEnabledCheck.Checked += SettingsChangedHandler;
+        BackgroundEnabledCheck.Unchecked += SettingsChangedHandler;
+        BackgroundColorBox.LostFocus += SettingsChangedHandler;
+        BackgroundOpacitySlider.ValueChanged += SettingsChangedHandler;
+        OverlayOpacitySlider.ValueChanged += SettingsChangedHandler;
+        TextColorBox.LostFocus += SettingsChangedHandler;
+        AccentColorBox.LostFocus += SettingsChangedHandler;
+        SecondaryAccentColorBox.LostFocus += SettingsChangedHandler;
+        FontSizeSlider.ValueChanged += SettingsChangedHandler;
+        PositionCombo.SelectionChanged += SettingsChangedHandler;
+        MonitorCombo.SelectionChanged += SettingsChangedHandler;
+        EdgeReferenceCombo.SelectionChanged += SettingsChangedHandler;
+        IntervalCombo.SelectionChanged += SettingsChangedHandler;
+        CpuCheck.Checked += SettingsChangedHandler;
+        CpuCheck.Unchecked += SettingsChangedHandler;
+        GpuCheck.Checked += SettingsChangedHandler;
+        GpuCheck.Unchecked += SettingsChangedHandler;
+        RamCheck.Checked += SettingsChangedHandler;
+        RamCheck.Unchecked += SettingsChangedHandler;
+        FpsCheck.Checked += SettingsChangedHandler;
+        FpsCheck.Unchecked += SettingsChangedHandler;
+        OffsetXSlider.ValueChanged += OffsetSliderChanged;
+        OffsetYSlider.ValueChanged += OffsetSliderChanged;
+        OffsetXBox.LostFocus += OffsetTextChanged;
+        OffsetYBox.LostFocus += OffsetTextChanged;
     }
 
-    private void Save(bool updateStartup = false)
+    private void StartupChanged(object sender, RoutedEventArgs e)
     {
         if (!initialized)
         {
             return;
         }
 
-        if (updateStartup)
+        try
         {
-            try
+            startupManager.SetEnabled(StartupCheck.IsChecked == true);
+            ApplySettings();
+        }
+        catch (Exception exception) when (
+            exception is UnauthorizedAccessException or InvalidOperationException or System.Security.SecurityException)
+        {
+            AppLog.Error($"Unable to update current-user startup registration. {exception.Message}");
+            StartupCheck.IsChecked = startupManager.IsEnabled();
+        }
+    }
+
+    private void SettingsChangedHandler(object sender, RoutedEventArgs e) => ApplySettings();
+
+    private void OffsetSliderChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (!initialized || synchronizingOffsets)
+        {
+            return;
+        }
+
+        synchronizingOffsets = true;
+        try
+        {
+            if (ReferenceEquals(sender, OffsetXSlider))
             {
-                startupManager.SetEnabled(StartupCheck.IsChecked == true);
+                OffsetXBox.Text = ((int)OffsetXSlider.Value).ToString(CultureInfo.InvariantCulture);
             }
-            catch (Exception ex) when (ex is UnauthorizedAccessException or InvalidOperationException or System.Security.SecurityException)
+            else
             {
-                AppLog.Error($"Unable to update user startup registration. {ex.Message}");
-                StartupCheck.IsChecked = startupManager.IsEnabled();
+                OffsetYBox.Text = ((int)OffsetYSlider.Value).ToString(CultureInfo.InvariantCulture);
             }
+        }
+        finally
+        {
+            synchronizingOffsets = false;
+        }
+
+        ApplySettings();
+    }
+
+    private void OffsetTextChanged(object sender, RoutedEventArgs e)
+    {
+        if (!initialized || synchronizingOffsets)
+        {
+            return;
+        }
+
+        var textBox = (System.Windows.Controls.TextBox)sender;
+        if (!TryParseOffset(textBox.Text, out var offset))
+        {
+            textBox.ToolTip = "Enter a whole number from -200 to 1000 DIPs.";
+            return;
+        }
+
+        textBox.ToolTip = null;
+        synchronizingOffsets = true;
+        try
+        {
+            if (ReferenceEquals(textBox, OffsetXBox))
+            {
+                OffsetXSlider.Value = offset;
+            }
+            else
+            {
+                OffsetYSlider.Value = offset;
+            }
+        }
+        finally
+        {
+            synchronizingOffsets = false;
+        }
+
+        ApplySettings();
+    }
+
+    private void ApplySettings()
+    {
+        if (!initialized ||
+            !TryReadColor(BackgroundColorBox, out var backgroundColor) ||
+            !TryReadColor(TextColorBox, out var textColor) ||
+            !TryReadColor(AccentColorBox, out var accentColor) ||
+            !TryReadColor(SecondaryAccentColorBox, out var secondaryColor) ||
+            !TryParseOffset(OffsetXBox.Text, out var offsetX) ||
+            !TryParseOffset(OffsetYBox.Text, out var offsetY))
+        {
+            return;
         }
 
         settings.StartWithWindows = startupManager.IsEnabled();
         settings.KeepOnTop = TopmostCheck.IsChecked == true;
         settings.IsLocked = LockedCheck.IsChecked == true;
-        PositionControls.IsEnabled = !settings.IsLocked;
+        settings.ClickThrough = ClickThroughCheck.IsChecked == true;
         settings.StartOverlayVisible = StartVisibleCheck.IsChecked == true;
+        settings.BackgroundEnabled = BackgroundEnabledCheck.IsChecked == true;
+        settings.BackgroundColor = backgroundColor;
+        settings.BackgroundOpacity = BackgroundOpacitySlider.Value;
+        settings.Opacity = OverlayOpacitySlider.Value;
+        settings.TextColor = textColor;
+        settings.AccentColor = accentColor;
+        settings.SecondaryAccentColor = secondaryColor;
+        settings.FontSize = FontSizeSlider.Value;
         settings.ShowCpu = CpuCheck.IsChecked == true;
         settings.ShowGpu = GpuCheck.IsChecked == true;
         settings.ShowRam = RamCheck.IsChecked == true;
         settings.ShowFps = FpsCheck.IsChecked == true;
-        if (IntervalCombo.SelectedItem is ComboBoxItem interval && int.TryParse(interval.Tag?.ToString(), out var milliseconds))
-        {
-            settings.RefreshIntervalMs = milliseconds;
-        }
-
+        settings.OffsetX = offsetX;
+        settings.OffsetY = offsetY;
         if (PositionCombo.SelectedItem is OverlayPosition position)
         {
             settings.Position = position;
@@ -145,31 +251,40 @@ public partial class SettingsWindow : Window
             settings.MonitorDeviceName = monitor.DeviceName;
         }
 
-        settings.FontSize = FontSlider.Value;
-        settings.Opacity = OpacitySlider.Value;
-        if (int.TryParse(OffsetXBox.Text, out var offsetX))
+        settings.EdgeReference = EdgeReferenceCombo.SelectedIndex == 0
+            ? OverlayEdgeReference.WorkArea
+            : OverlayEdgeReference.FullScreen;
+        if (IntervalCombo.SelectedItem is ComboBoxItem interval &&
+            int.TryParse(interval.Tag?.ToString(), out var milliseconds))
         {
-            settings.OffsetX = offsetX;
-        }
-        else
-        {
-            OffsetXBox.Text = settings.OffsetX.ToString();
-        }
-
-        if (int.TryParse(OffsetYBox.Text, out var offsetY))
-        {
-            settings.OffsetY = offsetY;
-        }
-        else
-        {
-            OffsetYBox.Text = settings.OffsetY.ToString();
+            settings.RefreshIntervalMs = milliseconds;
         }
 
         settings.Validate();
+        PositionControls.IsEnabled = !settings.IsLocked;
         SettingsChanged?.Invoke();
         saveTimer.Stop();
         saveTimer.Start();
     }
+
+    private static bool TryReadColor(System.Windows.Controls.TextBox textBox, out string value)
+    {
+        value = textBox.Text.Trim();
+        if (value.Length == 7 && value[0] == '#' && value.Skip(1).All(Uri.IsHexDigit))
+        {
+            value = value.ToUpperInvariant();
+            textBox.ToolTip = null;
+            return true;
+        }
+
+        textBox.ToolTip = "Enter a six-digit hex color such as #4DE3D2.";
+        textBox.Focus();
+        return false;
+    }
+
+    private static bool TryParseOffset(string text, out int value) =>
+        int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out value) &&
+        value is >= -200 and <= 1000;
 
     private void PersistSettings()
     {
@@ -177,36 +292,24 @@ public partial class SettingsWindow : Window
         {
             store.Save(settings);
         }
-        catch (IOException ex)
+        catch (IOException exception)
         {
-            AppLog.Error($"Unable to save settings. {ex.Message}");
+            AppLog.Error($"Unable to save settings. {exception.Message}");
         }
-        catch (UnauthorizedAccessException ex)
+        catch (UnauthorizedAccessException exception)
         {
-            AppLog.Error($"Unable to save settings. {ex.Message}");
+            AppLog.Error($"Unable to save settings. {exception.Message}");
         }
     }
 
     private void Reset_Click(object sender, RoutedEventArgs e)
     {
         var defaults = AppSettings.Defaults();
-        settings.Position = defaults.Position;
-        settings.OffsetX = defaults.OffsetX;
-        settings.OffsetY = defaults.OffsetY;
-        settings.MonitorDeviceName = Forms.Screen.PrimaryScreen?.DeviceName ?? string.Empty;
-        settings.RefreshIntervalMs = defaults.RefreshIntervalMs;
-        settings.FontSize = defaults.FontSize;
-        settings.Opacity = defaults.Opacity;
-        settings.ShowCpu = defaults.ShowCpu;
-        settings.ShowGpu = defaults.ShowGpu;
-        settings.ShowRam = defaults.ShowRam;
-        settings.ShowFps = defaults.ShowFps;
-        settings.KeepOnTop = defaults.KeepOnTop;
-        settings.IsLocked = defaults.IsLocked;
-        settings.StartOverlayVisible = defaults.StartOverlayVisible;
-        StartupCheck.IsChecked = defaults.StartWithWindows;
+        defaults.StartWithWindows = startupManager.IsEnabled();
+        defaults.MonitorDeviceName = Forms.Screen.PrimaryScreen?.DeviceName ?? string.Empty;
+        CopySettings(defaults, settings);
         LoadSettings();
-        Save();
+        ApplySettings();
     }
 
     private void Done_Click(object sender, RoutedEventArgs e)
@@ -227,6 +330,33 @@ public partial class SettingsWindow : Window
         }
 
         base.OnClosing(e);
+    }
+
+    private static void CopySettings(AppSettings source, AppSettings destination)
+    {
+        destination.Position = source.Position;
+        destination.EdgeReference = source.EdgeReference;
+        destination.OffsetX = source.OffsetX;
+        destination.OffsetY = source.OffsetY;
+        destination.MonitorDeviceName = source.MonitorDeviceName;
+        destination.RefreshIntervalMs = source.RefreshIntervalMs;
+        destination.FontSize = source.FontSize;
+        destination.Opacity = source.Opacity;
+        destination.BackgroundEnabled = source.BackgroundEnabled;
+        destination.BackgroundColor = source.BackgroundColor;
+        destination.BackgroundOpacity = source.BackgroundOpacity;
+        destination.TextColor = source.TextColor;
+        destination.AccentColor = source.AccentColor;
+        destination.SecondaryAccentColor = source.SecondaryAccentColor;
+        destination.ClickThrough = source.ClickThrough;
+        destination.ShowCpu = source.ShowCpu;
+        destination.ShowGpu = source.ShowGpu;
+        destination.ShowRam = source.ShowRam;
+        destination.ShowFps = source.ShowFps;
+        destination.StartWithWindows = source.StartWithWindows;
+        destination.StartOverlayVisible = source.StartOverlayVisible;
+        destination.KeepOnTop = source.KeepOnTop;
+        destination.IsLocked = source.IsLocked;
     }
 
     private sealed record MonitorOption(string DeviceName, string Name);

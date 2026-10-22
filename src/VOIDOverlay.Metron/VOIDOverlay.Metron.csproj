@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
-    <ApplicationIcon>..\..\assets\Metron.ico</ApplicationIcon>
+    <ApplicationIcon>assets\Metron.ico</ApplicationIcon>
     <AssemblyName>VOIDOverlay.Metron</AssemblyName>
     <AssemblyTitle>VOIDOverlay Metron</AssemblyTitle>
     <AssemblyDescription>A lightweight system performance overlay.</AssemblyDescription>
@@ -21,9 +21,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Resource Include="..\..\assets\Metron.ico">
-      <Link>assets\Metron.ico</Link>
-    </Resource>
+    <Resource Include="assets\Metron.ico" />
   </ItemGroup>
 
 </Project>
