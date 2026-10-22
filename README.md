@@ -26,7 +26,7 @@ To build a local package:
 3. Optionally run `.\scripts\package.ps1` to create `artifacts\VOIDOverlay-Metron-win-x64.zip`.
 4. Extract the ZIP and launch `VOIDOverlay.Metron.exe`.
 
-No release version, GitHub release, or download URL is configured yet, so the ZIP name is intentionally unversioned.
+Publishing stages and validates a replacement before updating an existing publish folder, and packaging only replaces an existing ZIP after the new archive is complete. No release version, GitHub release, or download URL is configured yet, so the ZIP name is intentionally unversioned.
 
 ## First launch and tray
 
