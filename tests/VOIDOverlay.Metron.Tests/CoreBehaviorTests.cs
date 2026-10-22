@@ -56,15 +56,18 @@ public sealed class CoreBehaviorTests
         {
             var store = new SettingsStore(path);
             Assert.Equal(500, store.Load().RefreshIntervalMs);
+            Assert.False(store.Load().BackgroundEnabled);
 
             var settings = AppSettings.Defaults();
             settings.Position = OverlayPosition.BottomRight;
             settings.OffsetX = 44;
+            settings.BackgroundEnabled = true;
             store.Save(settings);
 
             var loaded = store.Load();
             Assert.Equal(OverlayPosition.BottomRight, loaded.Position);
             Assert.Equal(44, loaded.OffsetX);
+            Assert.True(loaded.BackgroundEnabled);
         }
         finally
         {
@@ -103,6 +106,28 @@ public sealed class CoreBehaviorTests
     }
 
     [Fact]
+    public void ConfigurationUsesTransparentBackgroundWhenSettingIsMissing()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"metron-settings-{Guid.NewGuid():N}.json");
+        try
+        {
+            File.WriteAllText(path, """{"Position":1}""");
+
+            var loaded = new SettingsStore(path).Load();
+
+            Assert.False(loaded.BackgroundEnabled);
+            Assert.Equal(OverlayPosition.TopCenter, loaded.Position);
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Fact]
     public void AppearanceDefaultsMatchProductFamilyStandard()
     {
         var settings = AppSettings.Defaults();
@@ -111,7 +136,7 @@ public sealed class CoreBehaviorTests
         Assert.Equal(OverlayEdgeReference.WorkArea, settings.EdgeReference);
         Assert.Equal(13, settings.FontSize);
         Assert.Equal(1, settings.Opacity);
-        Assert.True(settings.BackgroundEnabled);
+        Assert.False(settings.BackgroundEnabled);
         Assert.Equal("#111720", settings.BackgroundColor);
         Assert.Equal(0.5, settings.BackgroundOpacity);
         Assert.Equal("#F2F4F7", settings.TextColor);

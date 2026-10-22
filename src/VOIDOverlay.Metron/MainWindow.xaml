@@ -16,7 +16,7 @@
         Focusable="False"
         WindowStartupLocation="Manual">
     <Border x:Name="OverlaySurface"
-            Background="#80111720"
+            Background="Transparent"
             CornerRadius="5"
             Padding="10,4">
         <StackPanel x:Name="MetricsPanel"

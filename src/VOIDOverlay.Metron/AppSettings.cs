@@ -29,7 +29,7 @@ public sealed class AppSettings
     public int RefreshIntervalMs { get; set; } = 500;
     public double FontSize { get; set; } = 13;
     public double Opacity { get; set; } = 1;
-    public bool BackgroundEnabled { get; set; } = true;
+    public bool BackgroundEnabled { get; set; }
     public string BackgroundColor { get; set; } = "#111720";
     public double BackgroundOpacity { get; set; } = 0.5;
     public string TextColor { get; set; } = "#F2F4F7";
