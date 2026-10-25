@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Globalization;
 using System.Windows;
 using Forms = System.Windows.Forms;
 
@@ -7,58 +8,131 @@ namespace VOIDOverlay.Metron;
 public static class PositionService
 {
     private const int MonitorDpiType = 0;
+    private const double EdgeMargin = 10;
+
+    public static string FormatCoordinate(double value) =>
+        Math.Round(value, 2, MidpointRounding.AwayFromZero).ToString("0.##", CultureInfo.InvariantCulture);
 
     public static void Apply(Window window, AppSettings settings)
     {
-        var monitors = Forms.Screen.AllScreens;
-        if (monitors.Length == 0)
+        var screen = FindScreen(settings.MonitorDeviceName);
+        if (screen is null)
         {
             return;
         }
 
-        var screen = monitors.FirstOrDefault(m => m.DeviceName.Equals(settings.MonitorDeviceName, StringComparison.OrdinalIgnoreCase))
-            ?? Forms.Screen.PrimaryScreen
-            ?? monitors[0];
+        var (scaleX, scaleY) = GetScale(screen);
+        var monitorBounds = ToDipRect(screen.Bounds, scaleX, scaleY);
+        var usableBounds = ToDipRect(
+            settings.EdgeReference == OverlayEdgeReference.FullScreen ? screen.Bounds : screen.WorkingArea,
+            scaleX,
+            scaleY);
         var windowWidth = window.ActualWidth > 0 ? window.ActualWidth : window.Width;
         var windowHeight = window.ActualHeight > 0 ? window.ActualHeight : window.Height;
-        var (scaleX, scaleY) = GetScale(screen);
-        var edgeBounds = settings.EdgeReference == OverlayEdgeReference.FullScreen ? screen.Bounds : screen.WorkingArea;
-        var left = edgeBounds.Left / scaleX;
-        var top = edgeBounds.Top / scaleY;
-        var width = edgeBounds.Width / scaleX;
-        var height = edgeBounds.Height / scaleY;
-        var placement = ComputePlacement(
-            new Rect(left, top, width, height),
-            windowWidth,
-            windowHeight,
-            settings.Position,
-            settings.OffsetX,
-            settings.OffsetY);
-        window.Left = placement.X;
-        window.Top = placement.Y;
+
+        if (settings.PositionCoordinatesVersion == 0)
+        {
+            var oldPosition = ComputeLegacyPlacement(
+                usableBounds,
+                windowWidth,
+                windowHeight,
+                settings.Position,
+                settings.OffsetX,
+                settings.OffsetY);
+            settings.OffsetX = oldPosition.X + windowWidth / 2 - monitorBounds.Left - monitorBounds.Width / 2;
+            settings.OffsetY = oldPosition.Y + windowHeight / 2 - monitorBounds.Top - monitorBounds.Height / 2;
+            settings.PositionCoordinatesVersion = 1;
+        }
+
+        var range = GetOffsetRange(monitorBounds, usableBounds, windowWidth, windowHeight);
+        settings.OffsetX = Math.Clamp(settings.OffsetX, range.MinimumX, range.MaximumX);
+        settings.OffsetY = Math.Clamp(settings.OffsetY, range.MinimumY, range.MaximumY);
+        window.Left = monitorBounds.Left + monitorBounds.Width / 2 + settings.OffsetX - windowWidth / 2;
+        window.Top = monitorBounds.Top + monitorBounds.Height / 2 + settings.OffsetY - windowHeight / 2;
     }
 
-    public static (double X, double Y) ComputePlacement(
+    public static (double MinimumX, double MaximumX, double MinimumY, double MaximumY) GetOffsetRange(
+        Rect monitorBounds,
+        Rect usableBounds,
+        double windowWidth,
+        double windowHeight)
+    {
+        var monitorCenterX = monitorBounds.Left + monitorBounds.Width / 2;
+        var monitorCenterY = monitorBounds.Top + monitorBounds.Height / 2;
+        var horizontalInset = Math.Min(windowWidth, usableBounds.Width) / 2;
+        var verticalInset = Math.Min(windowHeight, usableBounds.Height) / 2;
+        return (
+            usableBounds.Left + horizontalInset - monitorCenterX,
+            usableBounds.Right - horizontalInset - monitorCenterX,
+            usableBounds.Top + verticalInset - monitorCenterY,
+            usableBounds.Bottom - verticalInset - monitorCenterY);
+    }
+
+    public static (double X, double Y) GetPresetCoordinates(
+        Rect monitorBounds,
+        Rect usableBounds,
+        double windowWidth,
+        double windowHeight,
+        OverlayPosition preset)
+    {
+        var range = GetOffsetRange(monitorBounds, usableBounds, windowWidth, windowHeight);
+        var x = preset switch
+        {
+            OverlayPosition.TopLeft or OverlayPosition.CenterLeft or OverlayPosition.BottomLeft => range.MinimumX + EdgeMargin,
+            OverlayPosition.TopCenter or OverlayPosition.BottomCenter or OverlayPosition.Center => 0,
+            _ => range.MaximumX - EdgeMargin
+        };
+        var y = preset switch
+        {
+            OverlayPosition.TopLeft or OverlayPosition.TopCenter or OverlayPosition.TopRight => range.MinimumY + EdgeMargin,
+            OverlayPosition.CenterLeft or OverlayPosition.Center or OverlayPosition.CenterRight => 0,
+            _ => range.MaximumY - EdgeMargin
+        };
+        return (Math.Clamp(x, range.MinimumX, range.MaximumX), Math.Clamp(y, range.MinimumY, range.MaximumY));
+    }
+
+    public static Rect GetMonitorBoundsDip(Forms.Screen screen)
+    {
+        var (scaleX, scaleY) = GetScale(screen);
+        return ToDipRect(screen.Bounds, scaleX, scaleY);
+    }
+
+    public static Rect GetUsableBoundsDip(Forms.Screen screen, OverlayEdgeReference edgeReference)
+    {
+        var (scaleX, scaleY) = GetScale(screen);
+        return ToDipRect(edgeReference == OverlayEdgeReference.FullScreen ? screen.Bounds : screen.WorkingArea, scaleX, scaleY);
+    }
+
+    public static Forms.Screen? FindScreen(string deviceName) =>
+        Forms.Screen.AllScreens.FirstOrDefault(screen =>
+            screen.DeviceName.Equals(deviceName, StringComparison.OrdinalIgnoreCase))
+        ?? Forms.Screen.PrimaryScreen
+        ?? Forms.Screen.AllScreens.FirstOrDefault();
+
+    private static Rect ToDipRect(System.Drawing.Rectangle bounds, double scaleX, double scaleY) =>
+        new(bounds.Left / scaleX, bounds.Top / scaleY, bounds.Width / scaleX, bounds.Height / scaleY);
+
+    private static System.Windows.Point ComputeLegacyPlacement(
         Rect workArea,
         double windowWidth,
         double windowHeight,
         OverlayPosition position,
-        int offsetX,
-        int offsetY)
+        double offsetX,
+        double offsetY)
     {
-        const double margin = 10;
         var x = position switch
         {
-            OverlayPosition.TopLeft or OverlayPosition.BottomLeft => workArea.Left + margin,
-            OverlayPosition.TopCenter or OverlayPosition.BottomCenter => workArea.Left + (workArea.Width - windowWidth) / 2,
-            _ => workArea.Right - windowWidth - margin
+            OverlayPosition.TopLeft or OverlayPosition.BottomLeft or OverlayPosition.CenterLeft => workArea.Left + EdgeMargin,
+            OverlayPosition.TopCenter or OverlayPosition.BottomCenter or OverlayPosition.Center => workArea.Left + (workArea.Width - windowWidth) / 2,
+            _ => workArea.Right - windowWidth - EdgeMargin
         } + offsetX;
         var y = position switch
         {
-            OverlayPosition.TopLeft or OverlayPosition.TopCenter or OverlayPosition.TopRight => workArea.Top + margin,
-            _ => workArea.Bottom - windowHeight - margin
+            OverlayPosition.TopLeft or OverlayPosition.TopCenter or OverlayPosition.TopRight => workArea.Top + EdgeMargin,
+            OverlayPosition.CenterLeft or OverlayPosition.Center or OverlayPosition.CenterRight => workArea.Top + (workArea.Height - windowHeight) / 2,
+            _ => workArea.Bottom - windowHeight - EdgeMargin
         } + offsetY;
-        return (
+        return new System.Windows.Point(
             Math.Clamp(x, workArea.Left, Math.Max(workArea.Left, workArea.Right - windowWidth)),
             Math.Clamp(y, workArea.Top, Math.Max(workArea.Top, workArea.Bottom - windowHeight)));
     }

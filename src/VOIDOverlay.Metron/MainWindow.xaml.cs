@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Effects;
 
 namespace VOIDOverlay.Metron;
 
@@ -46,17 +47,18 @@ public partial class MainWindow : Window
 
     public void ApplyAppearance()
     {
+        FontFamily = new System.Windows.Media.FontFamily(settings.FontFamily);
         FontSize = settings.FontSize;
         Opacity = settings.Opacity;
         Topmost = settings.KeepOnTop;
-        OverlaySurface.Background = CreateBrush(
-            settings.BackgroundColor,
-            settings.BackgroundOpacity,
-            settings.BackgroundEnabled);
         CpuText.Foreground = CreateBrush(settings.AccentColor);
         GpuText.Foreground = CreateBrush(settings.SecondaryAccentColor);
         RamText.Foreground = CreateBrush(settings.TextColor);
         FpsText.Foreground = CreateBrush(settings.TextColor);
+        CpuText.Effect = CreateReadabilityEffect(settings.Readability);
+        GpuText.Effect = CreateReadabilityEffect(settings.Readability);
+        RamText.Effect = CreateReadabilityEffect(settings.Readability);
+        FpsText.Effect = CreateReadabilityEffect(settings.Readability);
         ApplyClickThroughState();
         CpuText.Visibility = settings.ShowCpu ? Visibility.Visible : Visibility.Collapsed;
         GpuText.Visibility = settings.ShowGpu ? Visibility.Visible : Visibility.Collapsed;
@@ -70,6 +72,12 @@ public partial class MainWindow : Window
             (RamText, settings.ShowRam),
             (FpsText, settings.ShowFps)
         }.Where(item => item.Item2).Select(item => item.Item1).ToArray();
+        MetricsPanel.Visibility = visibleMetrics.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+        OverlaySurface.Padding = visibleMetrics.Length == 0 ? new Thickness(0) : new Thickness(10, 4, 10, 4);
+        OverlaySurface.Background = CreateBrush(
+            settings.BackgroundColor,
+            settings.BackgroundOpacity,
+            settings.BackgroundEnabled && visibleMetrics.Length > 0);
         for (var index = 0; index < visibleMetrics.Length; index++)
         {
             if (index > 0)
@@ -77,11 +85,40 @@ public partial class MainWindow : Window
                 MetricsPanel.Children.Add(new TextBlock { Text = "|", Foreground = separatorBrush, Margin = new Thickness(0, 0, 8, 0) });
             }
 
+            visibleMetrics[index].Margin = new Thickness(0, 0, index < visibleMetrics.Length - 1 ? 8 : 0, 0);
             MetricsPanel.Children.Add(visibleMetrics[index]);
         }
 
         PositionService.Apply(this, settings);
     }
+
+    private static DropShadowEffect? CreateReadabilityEffect(TextReadability readability) =>
+        readability switch
+        {
+            TextReadability.Normal => null,
+            TextReadability.Shadow => new DropShadowEffect
+            {
+                Color = Colors.Black,
+                BlurRadius = 2,
+                ShadowDepth = 1,
+                Opacity = 0.8
+            },
+            TextReadability.Outline => new DropShadowEffect
+            {
+                Color = Colors.Black,
+                BlurRadius = 1,
+                ShadowDepth = 0,
+                Opacity = 1
+            },
+            TextReadability.HighContrast => new DropShadowEffect
+            {
+                Color = Colors.Black,
+                BlurRadius = 2,
+                ShadowDepth = 1,
+                Opacity = 1
+            },
+            _ => null
+        };
 
     public void RevealFromTray()
     {

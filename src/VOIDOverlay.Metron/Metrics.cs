@@ -314,6 +314,7 @@ public sealed class MetricsService : IDisposable
     private MemoryReading memoryReading = MemoryReading.Unavailable;
     private MetricReading<double> fpsReading = MetricReading<double>.Unavailable();
     private int refreshIntervalMs;
+    private int enabledMetrics = 0b1111;
 
     public MetricsService(int refreshIntervalMs)
     {
@@ -331,6 +332,15 @@ public sealed class MetricsService : IDisposable
     }
 
     public void SetRefreshInterval(int milliseconds) => Volatile.Write(ref refreshIntervalMs, milliseconds);
+
+    public void SetMetricVisibility(bool showCpu, bool showGpu, bool showRam, bool showFps)
+    {
+        var mask = (showCpu ? 1 : 0) |
+                   (showGpu ? 2 : 0) |
+                   (showRam ? 4 : 0) |
+                   (showFps ? 8 : 0);
+        Volatile.Write(ref enabledMetrics, mask);
+    }
 
     public void Dispose()
     {
@@ -372,17 +382,25 @@ public sealed class MetricsService : IDisposable
 
     private void SampleAll()
     {
-        try
+        var enabled = Volatile.Read(ref enabledMetrics);
+        if ((enabled & 1) != 0)
         {
-            cpuReading = cpu.Sample();
+            try
+            {
+                cpuReading = cpu.Sample();
+            }
+            catch (Exception ex)
+            {
+                cpuReading = MetricReading<double>.Unavailable(ex.Message);
+                AppLog.Error($"CPU sampling failed. {ex.Message}");
+            }
         }
-        catch (Exception ex)
+        else
         {
-            cpuReading = MetricReading<double>.Unavailable(ex.Message);
-            AppLog.Error($"CPU sampling failed. {ex.Message}");
+            cpuReading = MetricReading<double>.Unavailable();
         }
 
-        if (gpu is not null || DateTime.UtcNow >= nextGpuRetry)
+        if ((enabled & 2) != 0 && (gpu is not null || DateTime.UtcNow >= nextGpuRetry))
         {
             try
             {
@@ -398,17 +416,33 @@ public sealed class MetricsService : IDisposable
                 AppLog.Warning($"GPU utilization is unavailable. {ex.Message}");
             }
         }
-
-        try
+        else if ((enabled & 2) == 0)
         {
-            memoryReading = memory.Sample();
+            gpu?.Dispose();
+            gpu = null;
+            nextGpuRetry = DateTime.MinValue;
+            gpuReading = MetricReading<double>.Unavailable();
         }
-        catch (Exception ex)
+
+        if ((enabled & 4) != 0)
+        {
+            try
+            {
+                memoryReading = memory.Sample();
+            }
+            catch (Exception ex)
+            {
+                memoryReading = MemoryReading.Unavailable;
+                AppLog.Error($"RAM sampling failed. {ex.Message}");
+            }
+        }
+        else
         {
             memoryReading = MemoryReading.Unavailable;
-            AppLog.Error($"RAM sampling failed. {ex.Message}");
         }
 
-        fpsReading = FpsProviderBoundary.Read(fps);
+        fpsReading = (enabled & 8) != 0
+            ? FpsProviderBoundary.Read(fps)
+            : MetricReading<double>.Unavailable();
     }
 }

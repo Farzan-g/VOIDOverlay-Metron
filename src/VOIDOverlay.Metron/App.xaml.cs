@@ -48,10 +48,29 @@ public partial class App : System.Windows.Application
         var settings = settingsStore.Load();
         startupManager = new StartupManager();
         settings.StartWithWindows = startupManager.IsEnabled();
+        var migratePosition = settings.PositionCoordinatesVersion == 0;
         overlay = new MainWindow(settings);
-        settingsWindow = new SettingsWindow(settings, settingsStore, startupManager);
+        settingsWindow = new SettingsWindow(settings, settingsStore, startupManager, () => (overlay.ActualWidth, overlay.ActualHeight));
+        overlay.SizeChanged += (_, _) => settingsWindow?.RefreshPositionRange();
         settingsWindow.SettingsChanged += OnSettingsChanged;
+        if (migratePosition)
+        {
+            try
+            {
+                settingsStore.Save(settings);
+            }
+            catch (IOException ex)
+            {
+                AppLog.Error($"Unable to save migrated position settings. {ex.Message}");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                AppLog.Error($"Unable to save migrated position settings. {ex.Message}");
+            }
+        }
+
         metricsService = new MetricsService(settings.RefreshIntervalMs);
+        metricsService.SetMetricVisibility(settings.ShowCpu, settings.ShowGpu, settings.ShowRam, settings.ShowFps);
         metricsService.SnapshotAvailable += OnSnapshotAvailable;
         trayIcon = CreateTrayIcon(settings, startupManager);
 
@@ -156,6 +175,11 @@ public partial class App : System.Windows.Application
         {
             overlay.ApplyAppearance();
             metricsService.SetRefreshInterval(settingsWindow.Settings.RefreshIntervalMs);
+            metricsService.SetMetricVisibility(
+                settingsWindow.Settings.ShowCpu,
+                settingsWindow.Settings.ShowGpu,
+                settingsWindow.Settings.ShowRam,
+                settingsWindow.Settings.ShowFps);
             lockMenuItem!.Checked = settingsWindow.Settings.IsLocked;
             startupMenuItem!.Checked = settingsWindow.Settings.StartWithWindows;
             UpdateTrayMenu();

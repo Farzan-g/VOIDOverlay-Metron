@@ -10,7 +10,9 @@ The project is an independent VOID Overlay sibling. It does not depend on or mod
 - CPU utilization from Windows `GetSystemTimes`.
 - Physical memory from `GlobalMemoryStatusEx`, displayed in binary GiB with a one-decimal presentation.
 - GPU engine activity from the documented Windows GPU Engine performance counter through PDH.
-- Six position anchors, offsets, monitor selection, font size, opacity, metric visibility, and refresh interval settings.
+- Nine one-time position presets plus unrestricted center-origin X/Y offsets, monitor selection, font family/size, opacity, metric visibility, and refresh interval settings.
+- Independent CPU, GPU, RAM, and FPS visibility; disabled metrics are not sampled.
+- System, Light, and Dark Settings themes, plus independent Normal, Shadow, Outline, and High Contrast overlay text readability options.
 - User-level startup registration and a tray menu for overlay, settings, lock, About, and exit controls.
 - User-writable settings and diagnostic logs under `%LOCALAPPDATA%\VOIDOverlay\Metron`.
 - No telemetry, analytics, network calls, drivers, game injection, or administrator requirement.
@@ -40,7 +42,7 @@ Metron starts with the overlay visible by default. The tray icon remains availab
 
 Closing the settings window hides it rather than exiting the application. Use **Exit** in the tray menu to stop monitoring and shut down cleanly. A second launch asks the existing process to reveal its overlay instead of starting another instance.
 
-The normal overlay is non-activating and click-through. Use Settings or the tray to change its position; no click or drag on the overlay itself is required. Position changes are clamped to the selected monitor's working area. A disconnected monitor falls back to the primary monitor.
+The normal overlay is non-activating and click-through. Use Settings or the tray to change its position; no click or drag on the overlay itself is required. Position is measured from the selected display's center in DIPs: `(0, 0)` centers the overlay, positive X/Y move right/down, and negative values move left/up. Presets place the overlay near a selected edge with a consistent margin but do not constrain later movement. Position changes are clamped so the overlay remains within the selected work area (or full screen when selected). A disconnected monitor falls back to the primary monitor. Older anchor-relative positions are converted to center-origin coordinates on first launch and saved.
 
 ## Readings and limitations
 
@@ -74,7 +76,7 @@ Settings are persisted as JSON under the current user's Local AppData directory,
 
 The startup toggle writes only the current user's `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` entry. It does not require elevation, alter machine-wide settings, or make startup mandatory. Removing the app does not uninstall that entry automatically; turn it off in the tray/settings before deleting the executable.
 
-Settings apply immediately. Supported update intervals are 250, 500, 1000, and 2000 ms. Ordinary unavailable metrics display `—`, which is different from a measured zero.
+Settings apply immediately. Choose System to follow the Windows app light/dark preference; explicit Light and Dark modes remain independent of overlay colors. Background visibility and text readability are independent, so readable text effects work on a transparent background. Supported update intervals are 250, 500, 750, 1000, 2000, and 5000 ms. Ordinary unavailable metrics display `—`, which is different from a measured zero.
 
 ## Troubleshooting
 

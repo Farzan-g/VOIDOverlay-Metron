@@ -62,12 +62,24 @@ public sealed class CoreBehaviorTests
             settings.Position = OverlayPosition.BottomRight;
             settings.OffsetX = 44;
             settings.BackgroundEnabled = true;
+            settings.ShowCpu = false;
+            settings.ShowGpu = true;
+            settings.ShowRam = false;
+            settings.ShowFps = false;
+            settings.Theme = SettingsTheme.Dark;
+            settings.Readability = TextReadability.HighContrast;
             store.Save(settings);
 
             var loaded = store.Load();
             Assert.Equal(OverlayPosition.BottomRight, loaded.Position);
             Assert.Equal(44, loaded.OffsetX);
             Assert.True(loaded.BackgroundEnabled);
+            Assert.False(loaded.ShowCpu);
+            Assert.True(loaded.ShowGpu);
+            Assert.False(loaded.ShowRam);
+            Assert.False(loaded.ShowFps);
+            Assert.Equal(SettingsTheme.Dark, loaded.Theme);
+            Assert.Equal(TextReadability.HighContrast, loaded.Readability);
         }
         finally
         {
@@ -142,12 +154,15 @@ public sealed class CoreBehaviorTests
         Assert.Equal("#F2F4F7", settings.TextColor);
         Assert.Equal("#4DE3D2", settings.AccentColor);
         Assert.Equal("#FFAE5C", settings.SecondaryAccentColor);
+        Assert.Equal("Segoe UI", settings.FontFamily);
+        Assert.Equal(SettingsTheme.System, settings.Theme);
+        Assert.Equal(TextReadability.Normal, settings.Readability);
         Assert.True(settings.IsLocked);
         Assert.True(settings.ClickThrough);
     }
 
     [Fact]
-    public void SettingsValidationAppliesSharedAppearanceAndOffsetRanges()
+    public void SettingsValidationAppliesSharedAppearanceAndFiniteCoordinateLimits()
     {
         var settings = new AppSettings
         {
@@ -155,8 +170,8 @@ public sealed class CoreBehaviorTests
             Opacity = double.NaN,
             BackgroundOpacity = 5,
             BackgroundColor = "invalid",
-            OffsetX = -900,
-            OffsetY = 5000
+            OffsetX = -50000,
+            OffsetY = 50000
         };
 
         settings.Validate();
@@ -165,22 +180,90 @@ public sealed class CoreBehaviorTests
         Assert.Equal(1, settings.Opacity);
         Assert.Equal(1, settings.BackgroundOpacity);
         Assert.Equal("#111720", settings.BackgroundColor);
-        Assert.Equal(-200, settings.OffsetX);
-        Assert.Equal(1000, settings.OffsetY);
+        Assert.Equal(-10000, settings.OffsetX);
+        Assert.Equal(10000, settings.OffsetY);
     }
 
     [Fact]
-    public void PositionCalculationAppliesAnchorOffsetsAndClampsToWorkArea()
+    public void PositionRangesAndPresetsUseMonitorCenteredCoordinates()
     {
-        var area = new Rect(100, 50, 800, 600);
+        var monitor = new Rect(0, 0, 1920, 1080);
+        var usableArea = new Rect(0, 0, 1920, 1040);
+        var range = PositionService.GetOffsetRange(monitor, usableArea, 400, 40);
+        var topLeft = PositionService.GetPresetCoordinates(
+            monitor, usableArea, 400, 40, OverlayPosition.TopLeft);
+        var center = PositionService.GetPresetCoordinates(
+            monitor, usableArea, 400, 40, OverlayPosition.Center);
+        var bottomRight = PositionService.GetPresetCoordinates(
+            monitor, usableArea, 400, 40, OverlayPosition.BottomRight);
 
-        var centered = PositionService.ComputePlacement(area, 200, 40, OverlayPosition.TopCenter, 10, 5);
-        var clamped = PositionService.ComputePlacement(area, 200, 40, OverlayPosition.BottomRight, 500, 500);
+        Assert.Equal(-760, range.MinimumX);
+        Assert.Equal(760, range.MaximumX);
+        Assert.Equal(-520, range.MinimumY);
+        Assert.Equal(480, range.MaximumY);
+        Assert.Equal((-750, -510), topLeft);
+        Assert.Equal((0, 0), center);
+        Assert.Equal((750, 470), bottomRight);
+    }
 
-        Assert.Equal(410, centered.X);
-        Assert.Equal(65, centered.Y);
-        Assert.Equal(700, clamped.X);
-        Assert.Equal(610, clamped.Y);
+    [Theory]
+    [InlineData(OverlayPosition.TopLeft, -750, -510)]
+    [InlineData(OverlayPosition.TopCenter, 0, -510)]
+    [InlineData(OverlayPosition.TopRight, 750, -510)]
+    [InlineData(OverlayPosition.CenterLeft, -750, 0)]
+    [InlineData(OverlayPosition.Center, 0, 0)]
+    [InlineData(OverlayPosition.CenterRight, 750, 0)]
+    [InlineData(OverlayPosition.BottomLeft, -750, 470)]
+    [InlineData(OverlayPosition.BottomCenter, 0, 470)]
+    [InlineData(OverlayPosition.BottomRight, 750, 470)]
+    public void EachPositionPresetUsesDisplaySizeAndOverlaySize(
+        OverlayPosition preset,
+        double expectedX,
+        double expectedY)
+    {
+        var coordinates = PositionService.GetPresetCoordinates(
+            new Rect(0, 0, 1920, 1080),
+            new Rect(0, 0, 1920, 1040),
+            400,
+            40,
+            preset);
+
+        Assert.Equal(expectedX, coordinates.X);
+        Assert.Equal(expectedY, coordinates.Y);
+    }
+
+    [Theory]
+    [InlineData(10.0, "10")]
+    [InlineData(-10.5, "-10.5")]
+    [InlineData(3.141, "3.14")]
+    [InlineData(0, "0")]
+    public void CoordinateFormattingIsCompactAndLimitedToTwoDecimals(double value, string expected)
+    {
+        Assert.Equal(expected, PositionService.FormatCoordinate(value));
+    }
+
+    [Fact]
+    public void ExistingAnchorSettingsAreMarkedForSafeCoordinateMigration()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"metron-settings-{Guid.NewGuid():N}.json");
+        try
+        {
+            File.WriteAllText(path, """{"Position":5,"OffsetX":40,"OffsetY":-25}""");
+
+            var loaded = new SettingsStore(path).Load();
+
+            Assert.Equal(OverlayPosition.BottomRight, loaded.Position);
+            Assert.Equal(40, loaded.OffsetX);
+            Assert.Equal(-25, loaded.OffsetY);
+            Assert.Equal(0, loaded.PositionCoordinatesVersion);
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
     }
 
     [Theory]
