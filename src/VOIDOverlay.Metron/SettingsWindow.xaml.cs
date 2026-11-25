@@ -3,7 +3,6 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using Forms = System.Windows.Forms;
@@ -436,21 +435,29 @@ public partial class SettingsWindow : Window
     {
         var dark = settings.Theme == SettingsTheme.Dark ||
                    (settings.Theme == SettingsTheme.System && !SystemUsesLightTheme());
-        SetBrush("SettingsWindowBrush", dark ? "#FF171C22" : "#FFF3F5F8");
-        SetBrush("SettingsCardBrush", dark ? "#FF202832" : "#FFFFFFFF");
-        SetBrush("SettingsForegroundBrush", dark ? "#FFF1F4F7" : "#FF18212B");
-        SetBrush("SettingsSecondaryBrush", dark ? "#FFB1BBC6" : "#FF5D6977");
-        SetBrush("SettingsAccentBrush", dark ? "#FF57D8CB" : "#FF007F78");
-        SetBrush("SettingsControlBrush", dark ? "#FF293440" : "#FFFFFFFF");
-        SetBrush("SettingsBorderBrush", dark ? "#FF485665" : "#FFD2D9E1");
-        SetBrush("SettingsHoverBrush", dark ? "#FF354A50" : "#FFE5F3F2");
-        SetBrush("SettingsSelectedBrush", dark ? "#FF3D5D61" : "#FFD0EAE7");
-        Resources[System.Windows.SystemColors.WindowBrushKey] = GetBrush(dark ? "#FF293440" : "#FFFFFFFF");
-        Resources[System.Windows.SystemColors.WindowTextBrushKey] = GetBrush(dark ? "#FFF1F4F7" : "#FF18212B");
-        Resources[System.Windows.SystemColors.ControlBrushKey] = GetBrush(dark ? "#FF293440" : "#FFF3F5F8");
-        Resources[System.Windows.SystemColors.ControlTextBrushKey] = GetBrush(dark ? "#FFF1F4F7" : "#FF18212B");
-        Resources[System.Windows.SystemColors.HighlightBrushKey] = GetBrush(dark ? "#FF3D5D61" : "#FFD0EAE7");
-        Resources[System.Windows.SystemColors.HighlightTextBrushKey] = GetBrush(dark ? "#FFF1F4F7" : "#FF18212B");
+        var paletteUri = new Uri(
+            dark ? "Themes/SettingsDark.xaml" : "Themes/SettingsLight.xaml",
+            UriKind.Relative);
+        var palette = new ResourceDictionary { Source = paletteUri };
+        var dictionaries = System.Windows.Application.Current.Resources.MergedDictionaries;
+        var paletteIndex = -1;
+        for (var index = 0; index < dictionaries.Count; index++)
+        {
+            if (dictionaries[index].Contains("SettingsThemePaletteToken"))
+            {
+                paletteIndex = index;
+                break;
+            }
+        }
+
+        if (paletteIndex < 0)
+        {
+            dictionaries.Add(palette);
+        }
+        else
+        {
+            dictionaries[paletteIndex] = palette;
+        }
     }
 
     private static bool SystemUsesLightTheme()
@@ -468,18 +475,6 @@ public partial class SettingsWindow : Window
             AppLog.Warning($"Unable to read the Windows app theme preference. {exception.Message}");
             return true;
         }
-    }
-
-    private void SetBrush(string key, string color)
-    {
-        Resources[key] = GetBrush(color);
-    }
-
-    private static SolidColorBrush GetBrush(string color)
-    {
-        var brush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(color));
-        brush.Freeze();
-        return brush;
     }
 
     private void OnUserPreferenceChanged(object? sender, UserPreferenceChangedEventArgs e)
